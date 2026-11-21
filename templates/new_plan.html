@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}새 계획 작성 {{ app_version }}{% endblock %}
+
+{% block content %}
+<section class="split-layout">
+  <article class="form-card">
+    <div class="section-head">
+      <p class="eyebrow">Create</p>
+      <h2>새 Activity 계획 등록</h2>
+      <p class="creator-meta">등록자: {{ login_user or '-' }}</p>
+    </div>
+    <form class="plan-form" method="post">
+      <label>
+        <span>제출 대상 여부</span>
+        <select name="selection" required>
+          <option value="">선택</option>
+          <option value="Y">Y</option>
+          <option value="N">N</option>
+        </select>
+      </label>
+      <label>
+        <span>Type</span>
+        <select name="equipment_spec" id="equipment_spec" required>
+          <option value="">선택</option>
+          {% for spec_name in spec_options.keys() %}
+          <option value="{{ spec_name }}">{{ spec_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>세부 사양 선택</span>
+        <select name="type_option" id="type_option">
+          <option value="">선택</option>
+        </select>
+      </label>
+      <label>
+        <span>Item</span>
+        <input type="text" name="equipment_name" placeholder="예: 창원 식기세척기 Top Cover 체결 설비" required>
+      </label>
+      <label>
+        <span>계획 시작일</span>
+        <input type="date" name="plan_start" min="{{ today }}" value="{{ today }}" required>
+      </label>
+      <button type="submit">계획 생성</button>
+    </form>
+  </article>
+
+  <article class="reference-card">
+    <div class="section-head">
+      <p class="eyebrow">Reference</p>
+      <h2>대상 설비 기준</h2>
+    </div>
+    <div class="reference-table">
+      <div class="reference-header">대상 설비</div>
+      <div class="reference-header">주요 기준 및 용량</div>
+      <div class="reference-header">세부조건 및 특징</div>
+      {% for row in reference_rows %}
+      <div>{{ row.equipment }}</div>
+      <div>{{ row.criteria }}</div>
+      <div>{{ row.details }}</div>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<script>
+  const specOptions = {{ spec_options | tojson }};
+  const equipmentSpec = document.getElementById('equipment_spec');
+  const typeOption = document.getElementById('type_option');
+
+  function renderTypeOptions() {
+    const currentSpec = equipmentSpec.value;
+    const options = specOptions[currentSpec] || [];
+    typeOption.innerHTML = '<option value="">선택</option>';
+    for (const option of options) {
+      const element = document.createElement('option');
+      element.value = option;
+      element.textContent = option;
+      typeOption.appendChild(element);
+    }
+  }
+
+  equipmentSpec.addEventListener('change', renderTypeOptions);
+</script>
+{% endblock %}

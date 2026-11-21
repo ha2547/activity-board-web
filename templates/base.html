@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Activity Board {{ app_version }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Activity Board</p>
+        <h1>빌트인/쿠킹솔루션 생산기술팀</h1>
+      </div>
+      <div class="hero-meta">
+        <span class="version-chip">{{ app_version }}</span>
+        {% if session.get('logged_in') %}
+        <div class="auth-meta">
+          <span class="login-user">{{ session.get('login_user', '사용자') }}</span>
+          <form method="post" action="{{ url_for('logout') }}">
+            <button type="submit" class="logout-btn">로그아웃</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <section class="flash-stack">
+      {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </section>
+    {% endif %}
+    {% endwith %}
+
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+
+</html>

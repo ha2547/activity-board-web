@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ plan.equipment_name }} {{ app_version }}{% endblock %}
+
+{% block content %}
+<section class="detail-shell">
+  <aside class="detail-sidebar">
+    <article class="summary-card coral">
+      <p class="eyebrow">Plan Summary</p>
+      <h2>{{ plan.equipment_name }}</h2>
+      <dl class="summary-list">
+        <div>
+          <dt>생성일</dt>
+          <dd>{{ created_at_display }}</dd>
+        </div>
+        <div>
+          <dt>수정일</dt>
+          <dd>{{ updated_at_display }}</dd>
+        </div>
+        <div>
+          <dt>등록자</dt>
+          <dd>{{ created_by }}</dd>
+        </div>
+        <div>
+          <dt>계획 기간</dt>
+          <dd>{{ summary.plan_start }} ~ {{ summary.plan_end }}</dd>
+        </div>
+      </dl>
+      {% if can_delete %}
+      <form class="summary-delete-form" method="post" action="{{ url_for('delete_plan_route', plan_id=plan.id) }}"
+        onsubmit="return confirm('해당 아이템을 삭제하시겠습니까?');">
+        <button type="submit" class="delete-item-btn">아이템 삭제</button>
+      </form>
+      {% endif %}
+    </article>
+  </aside>
+
+  <section class="detail-content">
+    <article class="table-card">
+      <div class="section-head inline-head detail-table-head">
+        <div>
+          <p class="eyebrow">ACTIVITY 일정</p>
+        </div>
+        <div class="detail-actions">
+          <form id="complete-select-form" method="post" action="{{ url_for('mark_selected_complete_route', plan_id=plan.id) }}"
+            class="inline-form complete-control-form">
+            <button type="submit" class="action-default-btn" {% if not complete_targets %}disabled{% endif %}>완료 처리</button>
+          </form>
+          <a class="text-action-link" href="{{ url_for('index') }}">목록으로</a>
+        </div>
+      </div>
+      <div class="plan-table-wrap">
+        <table class="plan-table">
+          <thead>
+            <tr>
+              <th>Activity</th>
+              <th>Status</th>
+              <th>소요기간</th>
+              <th>Delay</th>
+              <th>Plan Start</th>
+              <th>Plan End</th>
+              <th>Actual Start</th>
+              <th>Actual End</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+            <tr class="{{ row.tone }} {% if row.is_completed %}row-completed{% endif %}">
+              <td>
+                <div class="activity-cell" style="padding-left: {{ row.depth * 22 }}px;">
+                  {% if row.id == 'review' or row.depth > 0 %}
+                  <input type="checkbox" class="activity-check" name="row_ids" value="{{ row.id }}" form="complete-select-form" {% if row.status == 'C' %}disabled{% endif %}>
+                  {% endif %}
+                  {% if row.depth > 0 %}<span class="depth-line"></span>{% endif %}
+                  <span>{{ row.text }}</span>
+                </div>
+              </td>
+              <td><span class="status-text">{{ row.status_label }}</span></td>
+              <td>{{ row.duration }}</td>
+              <td>{% if row.has_delay %}<span class="delay-text">{{ row.delay }}</span>{% else %}{{ row.delay }}{% endif
+                %}</td>
+              <td>
+                <form method="post" action="{{ url_for('update_plan_start_route', plan_id=plan.id, row_id=row.id) }}"
+                  class="inline-form compact-form">
+                  <input class="auto-submit-date" type="date" name="plan_start" value="{{ row.plan_start }}"
+                    min="{{ today }}" {% if not row.editable_plan_dates %}disabled{% endif %}
+                    onchange="this.form.submit()">
+                </form>
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('update_plan_end_route', plan_id=plan.id, row_id=row.id) }}"
+                  class="inline-form compact-form">
+                  <input class="auto-submit-date" type="date" name="plan_end" value="{{ row.plan_end }}"
+                    min="{{ row.plan_start }}" {% if not row.editable_plan_dates %}disabled{% endif %}
+                    onchange="this.form.submit()">
+                </form>
+              </td>
+              <td>
+                {% if row.editable_actual %}
+                <form method="post" action="{{ url_for('update_actual_date_route', plan_id=plan.id, row_id=row.id) }}"
+                  class="inline-form compact-form">
+                  <input type="hidden" name="field_name" value="actual_start">
+                  <input class="auto-submit-date" type="date" name="selected_date" value="{{ row.actual_start }}"
+                    min="{{ row.plan_start }}" onchange="this.form.submit()">
+                </form>
+                {% else %}
+                <span class="muted-value">{{ row.actual_start or '-' }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.editable_actual %}
+                <form method="post" action="{{ url_for('update_actual_date_route', plan_id=plan.id, row_id=row.id) }}"
+                  class="inline-form compact-form">
+                  <input type="hidden" name="field_name" value="actual_end">
+                  <input class="auto-submit-date" type="date" name="selected_date" value="{{ row.actual_end }}"
+                    min="{{ row.actual_start or row.plan_start }}" onchange="this.form.submit()">
+                </form>
+                {% else %}
+                <span class="muted-value">{{ row.actual_end or '-' }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+</section>
+{% endblock %}

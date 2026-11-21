@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}사용자 등록 {{ app_version }}{% endblock %}
+
+{% block content %}
+<section class="login-wrap">
+  <article class="login-card">
+    <div class="section-head">
+      <p class="eyebrow">Sign Up</p>
+      <h2>사용자 등록</h2>
+    </div>
+
+    <form class="login-form" method="post">
+      <label>
+        <span>이름</span>
+        <input type="text" name="name" placeholder="이름 입력" required autofocus>
+      </label>
+      <label>
+        <span>사번</span>
+        <input type="text" name="employee_id" placeholder="숫자 사번 입력" inputmode="numeric" required>
+      </label>
+      <button type="submit">등록하기</button>
+    </form>
+
+    <div class="auth-extra-actions">
+      <span>이미 계정이 있으신가요?</span>
+      <a class="secondary-link" href="{{ url_for('login') }}">로그인으로 이동</a>
+    </div>
+  </article>
+</section>
+{% endblock %}

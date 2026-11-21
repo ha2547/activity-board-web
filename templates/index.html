@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}계획 게시판 {{ app_version }}{% endblock %}
+
+{% block content %}
+<section class="stats-grid">
+  <a class="stat-card stat-link sunrise {% if not status_filter %}is-active{% endif %}"
+    href="{{ url_for('index', q=keyword or None) }}">
+    <span class="stat-label">등록 계획</span>
+    <strong>{{ stats.plan_count }}</strong>
+  </a>
+  <a class="stat-card stat-link mint {% if status_filter == 'in_progress' %}is-active{% endif %}"
+    href="{{ url_for('index', q=keyword or None, status='in_progress') }}">
+    <span class="stat-label">진행 중</span>
+    <strong>{{ stats.in_progress_count }}</strong>
+  </a>
+  <a class="stat-card stat-link sand {% if status_filter == 'completed' %}is-active{% endif %}"
+    href="{{ url_for('index', q=keyword or None, status='completed') }}">
+    <span class="stat-label">완료</span>
+    <strong>{{ stats.completed_count }}</strong>
+  </a>
+</section>
+
+<section class="toolbar-card">
+  <form class="search-form" method="get">
+    {% if status_filter %}
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    {% endif %}
+    <input type="search" name="q" placeholder="Item 검색" value="{{ keyword }}">
+    <button type="submit">검색</button>
+    <a class="secondary-link" href="{{ url_for('index') }}">초기화</a>
+  </form>
+  <a class="primary-link" href="{{ url_for('new_plan') }}">새 계획 작성</a>
+</section>
+
+<section class="table-card board-table-card">
+  {% if plans %}
+  <div class="board-table-wrap">
+    <table class="board-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Type</th>
+          <th>등록자</th>
+          <th>진행 현황</th>
+          <th>현재 단계</th>
+          <th>계획 기간</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in plans %}
+        <tr>
+          <td>
+            <a class="board-title-link" href="{{ url_for('plan_detail', plan_id=plan.id) }}">
+              <strong class="board-title">{{ plan.equipment_name }}</strong>
+            </a>
+          </td>
+          <td>
+            <span class="board-spec-text">{{ plan.equipment_spec }}</span>
+          </td>
+          <td>
+            <span class="board-stage">{{ plan.created_by or '-' }}</span>
+          </td>
+          <td>
+            <div class="board-progress-cell">
+              <div class="board-progress-head">
+                <strong>{{ plan.progress_percent }}%</strong>
+                <span class="{% if plan.progress_dday_overdue %}progress-dday-overdue{% endif %}">{{ plan.progress_dday
+                  }}</span>
+              </div>
+              <div class="board-progress-bar" aria-label="달성률 {{ plan.progress_percent }}%">
+                <span class="board-progress-fill {% if plan.progress_percent == 100 %}is-complete{% endif %}"
+                  style="width: {{ plan.progress_percent }}%;"></span>
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="board-stage">{{ plan.current_stage }}</span>
+          </td>
+          <td>
+            <div class="board-date-cell">
+              <span>{{ plan.plan_start }}</span>
+              <span>{{ plan.plan_end }}</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <article class="empty-card board-empty-card">
+    <h2>표시할 계획이 없습니다</h2>
+    <p>새 계획을 만들어 게시판을 채워보세요.</p>
+  </article>
+  {% endif %}
+</section>
+{% endblock %}

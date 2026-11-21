@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: activity-board-web
+    env: python
+    rootDir: .
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: ACTIVITY_BOARD_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ACTIVITY_BOARD_HOST
+        value: 0.0.0.0
+      - key: ACTIVITY_BOARD_PORT
+        value: "10000"

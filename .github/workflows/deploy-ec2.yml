@@ -1,0 +1,40 @@
+name: Deploy Activity Board to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy project to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "./*"
+          target: "/opt/activity_board_web"
+
+      - name: Restart service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/activity_board_web
+            python3 -m venv .venv
+            . .venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            sudo systemctl daemon-reload
+            sudo systemctl enable activity-board.service
+            sudo systemctl restart activity-board.service
+            sudo systemctl status activity-board.service --no-pager

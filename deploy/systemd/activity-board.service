@@ -1,0 +1,16 @@
+[Unit]
+Description=Activity Board Flask Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/activity_board_web
+EnvironmentFile=/opt/activity_board_web/.env
+ExecStart=/opt/activity_board_web/.venv/bin/python /opt/activity_board_web/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
