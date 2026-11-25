@@ -113,7 +113,27 @@ def login_required(view_func):
 class UserStore:
     def __init__(self, users_file: Path):
         self.users_file = users_file
-        self._ensure_users_file()
+        self.database_url = os.environ.get("DATABASE_URL", "").strip()
+        self._db_enabled = bool(self.database_url)
+        self._pg_driver = None
+
+        if self._db_enabled:
+            self._ensure_users_table()
+            self._ensure_seed_user_db()
+        else:
+            self._ensure_users_file()
+
+    def _get_db_connection(self):
+        if self._pg_driver is None:
+            try:
+                import psycopg  # type: ignore[reportMissingImports]
+            except ImportError as exc:
+                raise RuntimeError(
+                    "DATABASE_URL이 설정되어 있지만 psycopg 패키지가 설치되지 않았습니다. "
+                    "requirements를 설치해 주세요."
+                ) from exc
+            self._pg_driver = psycopg
+        return self._pg_driver.connect(self.database_url, autocommit=True)
 
     def _default_user_record(self) -> dict[str, Any]:
         name, employee_id = get_default_user()
@@ -125,6 +145,46 @@ class UserStore:
 
     def _is_valid_user_record(self, user: dict[str, Any]) -> bool:
         return bool(str(user.get("name", "")).strip()) and bool(str(user.get("employee_id", "")).strip())
+
+    def _ensure_users_table(self) -> None:
+        with self._get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS users (
+                        employee_id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+
+    def _ensure_seed_user_db(self) -> None:
+        with self._get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM users")
+                row = cur.fetchone()
+                user_count = int(row[0]) if row else 0
+
+        if user_count > 0:
+            return
+
+        default_user = self._default_user_record()
+        with self._get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (employee_id, name, created_at)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (employee_id)
+                    DO UPDATE SET name = EXCLUDED.name
+                    """,
+                    (
+                        default_user["employee_id"],
+                        default_user["name"],
+                        default_user["created_at"],
+                    ),
+                )
 
     def _ensure_users_file(self) -> None:
         if not self.users_file.exists():
@@ -138,6 +198,28 @@ class UserStore:
         self.save_users(users)
 
     def load_users(self) -> list[dict[str, Any]]:
+        if self._db_enabled:
+            with self._get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT name, employee_id, created_at FROM users ORDER BY created_at ASC")
+                    rows = cur.fetchall()
+
+            users: list[dict[str, Any]] = []
+            for name, employee_id, created_at in rows:
+                created_at_text = (
+                    created_at.isoformat(timespec="seconds")
+                    if hasattr(created_at, "isoformat")
+                    else str(created_at)
+                )
+                users.append(
+                    {
+                        "name": str(name),
+                        "employee_id": str(employee_id),
+                        "created_at": created_at_text,
+                    }
+                )
+            return users
+
         try:
             with self.users_file.open("r", encoding="utf-8") as file:
                 payload = json.load(file)
@@ -147,11 +229,58 @@ class UserStore:
         return users if isinstance(users, list) else []
 
     def save_users(self, users: list[dict[str, Any]]) -> None:
+        if self._db_enabled:
+            with self._get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("TRUNCATE TABLE users")
+                    for user in users:
+                        if not self._is_valid_user_record(user):
+                            continue
+                        created_at = str(user.get("created_at", "")).strip() or datetime.now().isoformat(timespec="seconds")
+                        cur.execute(
+                            """
+                            INSERT INTO users (employee_id, name, created_at)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (employee_id)
+                            DO UPDATE SET
+                                name = EXCLUDED.name,
+                                created_at = EXCLUDED.created_at
+                            """,
+                            (
+                                str(user.get("employee_id", "")).strip(),
+                                str(user.get("name", "")).strip(),
+                                created_at,
+                            ),
+                        )
+            return
+
         with self.users_file.open("w", encoding="utf-8") as file:
             json.dump({"users": users}, file, ensure_ascii=False, indent=2)
 
     def find_user_by_employee_id(self, employee_id: str) -> dict[str, Any] | None:
         normalized = employee_id.strip()
+        if self._db_enabled:
+            with self._get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT name, employee_id, created_at FROM users WHERE employee_id = %s",
+                        (normalized,),
+                    )
+                    row = cur.fetchone()
+            if row is None:
+                return None
+            name, employee_id_value, created_at = row
+            created_at_text = (
+                created_at.isoformat(timespec="seconds")
+                if hasattr(created_at, "isoformat")
+                else str(created_at)
+            )
+            return {
+                "name": str(name),
+                "employee_id": str(employee_id_value),
+                "created_at": created_at_text,
+            }
+
         for user in self.load_users():
             if str(user.get("employee_id", "")).strip() == normalized:
                 return user
@@ -168,15 +297,32 @@ class UserStore:
         if self.find_user_by_employee_id(cleaned_employee_id) is not None:
             return False, "이미 등록된 사번입니다."
 
-        users = self.load_users()
-        users.append(
-            {
-                "name": cleaned_name,
-                "employee_id": cleaned_employee_id,
-                "created_at": datetime.now().isoformat(timespec="seconds"),
-            }
-        )
-        self.save_users(users)
+        if self._db_enabled:
+            created_at = datetime.now().isoformat(timespec="seconds")
+            with self._get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO users (employee_id, name, created_at)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (employee_id)
+                        DO NOTHING
+                        """,
+                        (cleaned_employee_id, cleaned_name, created_at),
+                    )
+                    if cur.rowcount == 0:
+                        return False, "이미 등록된 사번입니다."
+        else:
+            users = self.load_users()
+            users.append(
+                {
+                    "name": cleaned_name,
+                    "employee_id": cleaned_employee_id,
+                    "created_at": datetime.now().isoformat(timespec="seconds"),
+                }
+            )
+            self.save_users(users)
+
         return True, "사용자 등록이 완료되었습니다."
 
 
