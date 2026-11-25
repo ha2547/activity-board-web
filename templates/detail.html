@@ -42,10 +42,6 @@
           <p class="eyebrow">ACTIVITY 일정</p>
         </div>
         <div class="detail-actions">
-          <form id="complete-select-form" method="post" action="{{ url_for('mark_selected_complete_route', plan_id=plan.id) }}"
-            class="inline-form complete-control-form">
-            <button type="submit" class="action-default-btn" {% if not complete_targets %}disabled{% endif %}>완료 처리</button>
-          </form>
           <a class="text-action-link" href="{{ url_for('index') }}">목록으로</a>
         </div>
       </div>
@@ -68,9 +64,6 @@
             <tr class="{{ row.tone }} {% if row.is_completed %}row-completed{% endif %}">
               <td>
                 <div class="activity-cell" style="padding-left: {{ row.depth * 22 }}px;">
-                  {% if row.id == 'review' or row.depth > 0 %}
-                  <input type="checkbox" class="activity-check" name="row_ids" value="{{ row.id }}" form="complete-select-form" {% if row.status == 'C' %}disabled{% endif %}>
-                  {% endif %}
                   {% if row.depth > 0 %}<span class="depth-line"></span>{% endif %}
                   <span>{{ row.text }}</span>
                 </div>
@@ -112,8 +105,19 @@
                 <form method="post" action="{{ url_for('update_actual_date_route', plan_id=plan.id, row_id=row.id) }}"
                   class="inline-form compact-form">
                   <input type="hidden" name="field_name" value="actual_end">
+                  <input type="hidden" name="confirm_complete" value="0">
                   <input class="auto-submit-date" type="date" name="selected_date" value="{{ row.actual_end }}"
-                    min="{{ row.actual_start or row.plan_start }}" onchange="this.form.submit()">
+                    min="{{ row.actual_start or row.plan_start }}"
+                    onchange="
+                      if (this.value && '{{ row.status }}' !== 'C') {
+                        if (!confirm('Actual End를 입력하면 해당 Activity가 완료 처리됩니다. 계속하시겠습니까?')) {
+                          this.value='{{ row.actual_end }}';
+                          return;
+                        }
+                        this.form.querySelector('input[name=confirm_complete]').value = '1';
+                      }
+                      this.form.submit();
+                    ">
                 </form>
                 {% else %}
                 <span class="muted-value">{{ row.actual_end or '-' }}</span>

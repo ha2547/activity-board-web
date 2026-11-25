@@ -1167,13 +1167,19 @@ def update_actual_date_route(plan_id: str, row_id: str):
         return redirect(url_for("index"))
     field_name = request.form.get("field_name", "").strip()
     selected_date = request.form.get("selected_date", "").strip()
+    confirm_complete = request.form.get("confirm_complete", "").strip() == "1"
     try:
         if field_name not in {"actual_start", "actual_end"}:
             raise ValueError("수정할 Actual 날짜 필드가 올바르지 않습니다.")
         update_actual_date(plan, row_id, field_name, selected_date)
+        if field_name == "actual_end" and confirm_complete:
+            mark_activity_complete(plan, row_id)
         touch_plan(plan)
         store.upsert_plan(plan)
-        flash("Actual 날짜를 갱신했습니다.", "success")
+        if field_name == "actual_end" and confirm_complete:
+            flash("Actual End 입력으로 Activity를 완료 처리했습니다.", "success")
+        else:
+            flash("Actual 날짜를 갱신했습니다.", "success")
     except ValueError as exc:
         flash(str(exc), "error")
     return redirect(url_for("plan_detail", plan_id=plan_id))
